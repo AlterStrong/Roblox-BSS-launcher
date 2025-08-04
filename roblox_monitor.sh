@@ -1,204 +1,64 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# === KONFIGURASI ===
 GAME_LINK="roblox://placeId=1537690962"
 PKG_NAME="com.roblox.client"
 LOG_FILE="$HOME/roblox_log.txt"
 DISCORD_WEBHOOK="https://discord.com/api/webhooks/1363321007389020200/l6y9LMQzwcFu15uiQfC8XawlcqixNLukLcPoREBXyXYNqK9mFwGRW6qbgNJYmCTi9v_f"
 
-# === FUNGSI UMUM ===
 log() {
   echo "[$(date '+%F %T')] $1" >> "$LOG_FILE"
 }
 
 send_discord() {
-  message="$1"
+  msg="$1"
   curl -s -X POST -H "Content-Type: application/json" \
-    -d "{\"content\": \"@everyone $message\"}" "$DISCORD_WEBHOOK" > /dev/null
+    -d "{\"content\": \"@everyone $msg\"}" "$DISCORD_WEBHOOK" > /dev/null
 }
 
-# === FUNGSI MONITOR ===
 start_monitoring() {
   log "Memulai monitoring Roblox..."
   echo "Monitoring Roblox dimulai..."
 
   last_status="unknown"
-  uptime_counter=0
+  uptime=0
   tick=0
 
   while true
   do
     ps | grep "$PKG_NAME" | grep -v grep > /dev/null
     if [ $? -eq 0 ]; then
-      app_status="yes"
+      current_status="running"
     else
-      app_status="no"
+      current_status="closed"
     fi
 
-    if [ "$app_status" = "yes" ]; then
-      if [ "$last_status" != "running" ]; then
-        log "Roblox telah dibuka"
+    if [ "$current_status" != "$last_status" ]; then
+      if [ "$current_status" = "running" ]; then
         send_discord "Roblox telah dibuka."
-        last_status="running"
-      fi
-    else
-      if [ "$last_status" != "closed" ]; then
-        log "Roblox telah ditutup"
+        log "Roblox dibuka"
+      else
         send_discord "Roblox telah ditutup."
-        last_status="closed"
+        log "Roblox ditutup"
       fi
+      last_status="$current_status"
     fi
 
     tick=`expr $tick + 1`
     if [ `expr $tick % 24` -eq 0 ]; then
-      uptime_counter=`expr $uptime_counter + 2`
-      send_discord "Uptime: ${uptime_counter} jam"
+      uptime=`expr $uptime + 2`
+      send_discord "Uptime: $uptime jam"
     fi
 
     sleep 300
   done
 }
 
-# === MAIN ===
 if [ "$1" = "start" ]; then
   start_monitoring
 elif [ "$1" = "setup" ]; then
-  echo "Menjalankan Roblox untuk pertama kali..."
+  echo "Menjalankan Roblox..."
   am start -a android.intent.action.VIEW -d "$GAME_LINK"
-  log "Roblox dijalankan melalui setup."
-else
-  echo "Gunakan: bash roblox_monitor.sh start | setup"
-fi    fi
-
-    if [ "$app_status" = "yes" ]; then
-      if [ "$last_status" != "running" ]; then
-        log "Roblox telah dibuka"
-        send_discord "Roblox telah dibuka."
-        last_status="running"
-      fi
-    else
-      if [ "$last_status" != "closed" ]; then
-        log "Roblox telah ditutup"
-        send_discord "Roblox telah ditutup."
-        last_status="closed"
-      fi
-    fi
-
-    tick=$(expr $tick + 1)
-    if [ $(expr $tick % 24) -eq 0 ]; then
-      uptime_counter=$(expr $uptime_counter + 2)
-      send_discord "Uptime: ${uptime_counter} jam"
-    fi
-
-    sleep $interval_check
-  done
-}
-
-# === MAIN ===
-ARG="$1"
-
-if [ "$ARG" = "start" ]; then
-  start_monitoring
-elif [ "$ARG" = "setup" ]; then
-  echo "Menjalankan Roblox untuk pertama kali..."
-  am start -a android.intent.action.VIEW -d "$GAME_LINK"
-  log "Roblox dijalankan melalui setup."
-else
-  echo "Gunakan: bash roblox_monitor.sh start | setup"
-fi    fi
-
-    if [ "$app_status" = "yes" ]; then
-      if [ "$last_status" != "running" ]; then
-        log "Roblox telah dibuka"
-        send_discord "Roblox telah dibuka."
-        last_status="running"
-      fi
-    else
-      if [ "$last_status" != "closed" ]; then
-        log "Roblox telah ditutup"
-        send_discord "Roblox telah ditutup."
-        last_status="closed"
-      fi
-    fi
-
-    tick=$(expr $tick + 1)
-    if [ $(expr $tick % 24) -eq 0 ]; then
-      uptime_counter=$(expr $uptime_counter + 2)
-      send_discord "Uptime: ${uptime_counter} jam"
-    fi
-
-    sleep $interval_check
-  done
-}
-
-# === MAIN ===
-if [ "$1" = "start" ]; then
-  start_monitoring
-elif [ "$1" = "setup" ]; then
-  echo "Menjalankan Roblox untuk pertama kali..."
-  am start -a android.intent.action.VIEW -d "$GAME_LINK"
+  log "Roblox dijalankan lewat setup."
 else
   echo "Gunakan: bash roblox_monitor.sh start | setup"
 fi
-    if [ "$app_status" = "yes" ] && [ "$last_status" != "running" ]; then
-      log "Roblox telah dibuka"
-      send_discord "Roblox telah dibuka."
-      last_status="running"
-    elif [ "$app_status" = "no" ] && [ "$last_status" != "closed" ]; then
-      log "Roblox telah ditutup"
-      send_discord "Roblox telah ditutup."
-      last_status="closed"
-    fi
-
-    tick=$((tick + 1))
-    if [ $((tick % 24)) -eq 0 ]; then  # Setiap 2 jam
-      uptime_counter=$((uptime_counter + 2))
-      send_discord "Uptime: ${uptime_counter} jam"
-    fi
-
-    sleep $interval_check
-  done
-}
-
-# === MAIN ===
-case "$1" in
-  start)
-    start_monitoring
-    ;;
-  setup)
-    echo "Menjalankan Roblox untuk pertama kali..."
-    am start -a android.intent.action.VIEW -d "$GAME_LINK"
-    ;;
-  *)
-    echo "Gunakan: bash roblox_monitor.sh start | setup"
-    ;;
-esac      last_status="running"
-    elif [ "$app_running" = "no" ] && [ "$last_status" != "closed" ]; then
-      log "Roblox telah ditutup"
-      send_discord "Roblox telah ditutup."
-      last_status="closed"
-    fi
-
-    tick=$((tick + 1))
-    if [ $((tick % 24)) -eq 0 ]; then  # 2 jam sekali (5 menit × 24 = 120 menit = 2 jam)
-      uptime_counter=$((uptime_counter + 2))
-      send_discord "Uptime: ${uptime_counter} jam"
-    fi
-
-    sleep $interval_check
-  done
-}
-
-# === MAIN ===
-case "$1" in
-  start)
-    start_monitoring
-    ;;
-  setup)
-    echo "Menjalankan Roblox untuk pertama kali..."
-    am start -a android.intent.action.VIEW -d "$GAME_LINK"
-    ;;
-  *)
-    echo "Gunakan: bash roblox_monitor.sh start | setup"
-    ;;
-esac
