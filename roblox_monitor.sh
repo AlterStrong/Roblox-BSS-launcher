@@ -1,40 +1,86 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
 # === KONFIGURASI ===
-GAME_LINK="roblox://placeId=1537690962"
+GAME_LINK="roblox://placeId=1537690962/"
 PKG_NAME="com.roblox.client"
 DISCORD_WEBHOOK="https://discord.com/api/webhooks/1363321007389020200/l6y9LMQzwcFu15uiQfC8XawlcqixNLukLcPoREBXyXYNqK9mFwGRW6qbgNJYmCTi9v_f"
 LOG_FILE="$HOME/roblox_log.txt"
 PID_FILE="$HOME/.roblox_monitor_pid"
 
-log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
-}
-
+# === FUNGSI ===
 send_discord() {
-  curl -s -X POST -H "Content-Type: application/json" \
-    -d "{\"content\": \"$1\"}" "$DISCORD_WEBHOOK" > /dev/null
+  local message="$1"
+  curl -s -H "Content-Type: application/json" -X POST \
+    -d "{\"content\": \"$message\"}" "$DISCORD_WEBHOOK" > /dev/null
 }
 
-is_app_running() {
-  dumpsys window windows | grep -q "$PKG_NAME"
+open_game() {
+  am start -a android.intent.action.VIEW -d "$GAME_LINK"
 }
 
-monitor_loop() {
-  log "🔄 Memulai monitoring Roblox..."
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+}
+
+is_roblox_open() {
+  dumpsys window windows | grep -i "$PKG_NAME" > /dev/null
+}
+
+start_monitoring() {
+  send_discord ":rocket: Monitoring dimulai! Roblox akan auto-rejoin jika keluar."
+  log "Monitoring dimulai."
   local counter=0
-
   while true; do
-    if is_app_running; then
-      log "🎮 Roblox sedang berjalan"
-    else
-      log "🚀 Roblox tidak aktif, membuka Bee Swarm Simulator..."
-      am start -a android.intent.action.VIEW -d "$GAME_LINK" > /dev/null 2>&1
-      send_discord "🔁 Roblox tidak aktif, auto-rejoin ke Bee Swarm Simulator..."
+    if ! is_roblox_open; then
+      log "Roblox belum terbuka. Membuka ulang..."
+      open_game
+      send_discord ":video_game: Roblox tidak aktif. Auto-rejoin dilakukan."
       sleep 10
     fi
 
     counter=$((counter + 1))
+    if [ $((counter % 60)) -eq 0 ]; then
+      send_discord ":alarm_clock: Sudah 5 jam sejak monitoring dimulai."
+    fi
+
+    sleep 300  # 5 menit
+  done
+}
+
+stop_monitoring() {
+  if [ -f "$PID_FILE" ]; then
+    PID=$(cat "$PID_FILE")
+    kill "$PID" && rm -f "$PID_FILE"
+    send_discord ":stop_sign: Monitoring dihentikan secara manual."
+    log "Monitoring dihentikan."
+  else
+    echo "Monitoring tidak sedang berjalan."
+  fi
+}
+
+# === MAIN HANDLER ===
+case "$1" in
+  start)
+    if [ -f "$PID_FILE" ]; then
+      echo "Monitoring sudah berjalan."
+      exit 1
+    fi
+    nohup bash -c "$(declare -f send_discord open_game log is_roblox_open start_monitoring); start_monitoring" > /dev/null 2>&1 &
+    echo $! > "$PID_FILE"
+    echo "Monitoring dimulai."
+    ;;
+  stop)
+    stop_monitoring
+    ;;
+  setup)
+    pkg install -y termux-api curl
+    termux-setup-storage
+    echo "Setup selesai. Kamu bisa menjalankan: bash roblox_monitor.sh start"
+    ;;
+  *)
+    echo "Gunakan: bash roblox_monitor.sh {setup|start|stop}"
+    ;;
+esac    counter=$((counter + 1))
     if [ $((counter % 60)) -eq 0 ]; then
       send_discord "⏰ Reminder: Monitoring Roblox sudah berjalan selama $((counter / 12)) jam."
     fi
