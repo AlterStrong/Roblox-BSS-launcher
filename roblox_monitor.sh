@@ -1,10 +1,11 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
+# === KONFIGURASI ===
 GAME_LINK="roblox://placeId=1537690962"
-PKG_NAME="com.roblox.client"
-LOG_FILE="$HOME/roblox_log.txt"
 DISCORD_WEBHOOK="https://discord.com/api/webhooks/1363321007389020200/l6y9LMQzwcFu15uiQfC8XawlcqixNLukLcPoREBXyXYNqK9mFwGRW6qbgNJYmCTi9v_f"
+LOG_FILE="$HOME/roblox_log.txt"
 
+# === FUNGSI ===
 log() {
   echo "[$(date '+%F %T')] $1" >> "$LOG_FILE"
 }
@@ -15,26 +16,37 @@ send_discord() {
     -d "{\"content\": \"@everyone $msg\"}" "$DISCORD_WEBHOOK" > /dev/null
 }
 
+# === FUNGSI MONITOR ===
 start_monitoring() {
-  log "Memulai monitoring Roblox..."
-  echo "Monitoring Roblox dimulai..."
-
-  last_status="unknown"
-  uptime=0
+  log "Monitoring dimulai..."
+  echo "Monitoring dimulai..."
   tick=0
+  uptime_counter=0
 
-  while true
-  do
-    ps | grep "$PKG_NAME" | grep -v grep > /dev/null
-    if [ $? -eq 0 ]; then
-      current_status="running"
-    else
-      current_status="closed"
+  while true; do
+    tick=$((tick + 1))
+    if [ $((tick % 24)) -eq 0 ]; then
+      uptime_counter=$((uptime_counter + 2))
+      send_discord "Uptime: ${uptime_counter} jam"
     fi
+    sleep 300
+  done
+}
 
-    if [ "$current_status" != "$last_status" ]; then
-      if [ "$current_status" = "running" ]; then
-        send_discord "Roblox telah dibuka."
+# === MAIN ===
+case "$1" in
+  setup)
+    send_discord "Roblox dimulai."
+    am start -a android.intent.action.VIEW -d "$GAME_LINK"
+    ;;
+  start)
+    send_discord "Memulai monitoring Roblox."
+    start_monitoring
+    ;;
+  *)
+    echo "Gunakan: bash roblox_monitor.sh start | setup"
+    ;;
+esac        send_discord "Roblox telah dibuka."
         log "Roblox dibuka"
       else
         send_discord "Roblox telah ditutup."
