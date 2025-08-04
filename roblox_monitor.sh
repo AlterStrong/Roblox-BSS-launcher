@@ -24,17 +24,51 @@ start_monitoring() {
 
   last_status="unknown"
   uptime_counter=0
-  interval_check=300  # 5 menit
   tick=0
 
   while true
   do
-    ps_output=$(ps | grep "$PKG_NAME" | grep -v grep)
-    if [ -n "$ps_output" ]; then
+    ps | grep "$PKG_NAME" | grep -v grep > /dev/null
+    if [ $? -eq 0 ]; then
       app_status="yes"
     else
       app_status="no"
     fi
+
+    if [ "$app_status" = "yes" ]; then
+      if [ "$last_status" != "running" ]; then
+        log "Roblox telah dibuka"
+        send_discord "Roblox telah dibuka."
+        last_status="running"
+      fi
+    else
+      if [ "$last_status" != "closed" ]; then
+        log "Roblox telah ditutup"
+        send_discord "Roblox telah ditutup."
+        last_status="closed"
+      fi
+    fi
+
+    tick=`expr $tick + 1`
+    if [ `expr $tick % 24` -eq 0 ]; then
+      uptime_counter=`expr $uptime_counter + 2`
+      send_discord "Uptime: ${uptime_counter} jam"
+    fi
+
+    sleep 300
+  done
+}
+
+# === MAIN ===
+if [ "$1" = "start" ]; then
+  start_monitoring
+elif [ "$1" = "setup" ]; then
+  echo "Menjalankan Roblox untuk pertama kali..."
+  am start -a android.intent.action.VIEW -d "$GAME_LINK"
+  log "Roblox dijalankan melalui setup."
+else
+  echo "Gunakan: bash roblox_monitor.sh start | setup"
+fi    fi
 
     if [ "$app_status" = "yes" ]; then
       if [ "$last_status" != "running" ]; then
