@@ -1,8 +1,8 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
 cd "$(dirname "$0")"
-
 FILE="roblox_monitor.sh"
+
 if [ -f "$FILE" ]; then
   bash "$FILE" stop
 else
