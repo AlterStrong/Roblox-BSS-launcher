@@ -3,38 +3,80 @@
 # === KONFIGURASI ===
 GAME_LINK="roblox://placeId=1537690962"
 PKG_NAME="com.roblox.client"
-WEBHOOK="https://discord.com/api/webhooks/1363321007389020200/l6y9LMQzwcFu15uiQfC8XawlcqixNLukLcPoREBXyXYNqK9mFwGRW6qbgNJYmCTi9v_f"
-MONITOR_DIR="$HOME/roblox_monitor"
-LOG_FILE="$MONITOR_DIR/log.txt"
-PID_FILE="$MONITOR_DIR/monitor.pid"
+DISCORD_WEBHOOK="https://discord.com/api/webhooks/1363321007389020200/l6y9LMQzwcFu15uiQfC8XawlcqixNLukLcPoREBXyXYNqK9mFwGRW6qbgNJYmCTi9v_f"
+LOWBAT_NOTIFY_FILE="$HOME/.roblox_lowbat"
+LOG_FILE="$HOME/roblox_log.txt"
 
-# === FUNGSI ===
-log(){ echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"; }
-send_discord(){
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+send_discord() {
   curl -s -X POST -H "Content-Type: application/json" \
-    -d "{\"content\": \"$1\"}" "$WEBHOOK" > /dev/null
-}
-check_battery(){
-  battery=$(termux-battery-status)
-  percent=$(echo "$battery" | grep -o '"percentage": *[0-9]*' | grep -o '[0-9]*')
-  plugged=$(echo "$battery" | grep -i '"plugged":' | grep -o '[a-zA-Z]*$')
-}
-is_app_running(){
-  dumpsys window windows | grep -i "mCurrentFocus" | grep "$PKG_NAME" > /dev/null
-  return $?
+    -d "{\"content\": \"$1\"}" "$DISCORD_WEBHOOK" > /dev/null
 }
 
-monitor_loop(){
-  mkdir -p "$MONITOR_DIR"
-  touch "$LOG_FILE"
-  log "🔁 Monitoring Roblox dimulai"
-  send_discord "📲 Monitoring dimulai. Auto‑join Bee Swarm Simulator aktif."
-  lowbat_warned=false
+launch_game() {
+  am start "$GAME_LINK" > /dev/null 2>&1
+}
 
+is_roblox_running() {
+  dumpsys window windows | grep -q "$PKG_NAME"
+}
+
+check_battery_low() {
+  local percent
+  percent=$(termux-battery-status | grep -o '"percentage": *[0-9]*' | grep -o '[0-9]*')
+  [ "$percent" -lt 20 ]
+}
+
+monitor_loop() {
+  log "Monitoring dimulai"
   while true; do
-    check_battery
-    if [ "$percent" -lt 20 ] && [[ "$plugged" != "AC" && "$plugged" != "USB" ]]; then
-      log "⚠️ Baterai rendah: $percent%"
+    if is_roblox_running; then
+      log "Roblox dibuka"
+      send_discord "🎮 Roblox baru saja dibuka!"
+      sleep 300  # Tunggu 5 menit sebelum cek ulang
+    elif check_battery_low; then
+      log "Baterai < 20%"
+      if [ ! -f "$LOWBAT_NOTIFY_FILE" ]; then
+        touch "$LOWBAT_NOTIFY_FILE"
+      fi
+      while check_battery_low; do
+        send_discord "⚠️ Baterai kurang dari 20%! Harap isi daya."
+        sleep 60
+        grep -qi "baiklah" <<< "$(tail -n 1 "$LOG_FILE")" && break
+      done
+      rm -f "$LOWBAT_NOTIFY_FILE"
+    else
+      log "Meluncurkan ulang Roblox"
+      launch_game
+      sleep 10
+    fi
+  done
+}
+
+case "$1" in
+  setup)
+    termux-setup-storage
+    pkg install -y termux-api curl
+    log "Setup selesai"
+    ;;
+  start)
+    log "Memulai monitor di background"
+    nohup bash "$0" loop > /dev/null 2>&1 &
+    ;;
+  stop)
+    pkill -f "$0 loop"
+    log "Monitoring dihentikan"
+    ;;
+  loop)
+    monitor_loop
+    ;;
+  *)
+    echo "Gunakan: $0 [setup|start|stop]"
+    ;;
+esac      log "⚠️ Baterai rendah: $percent%"
       if ! $lowbat_warned; then
         send_discord "⚠️ Baterai < 20%! Ketik 'Baiklah' di Termux untuk hentikan notifikasi."
         lowbat_warned=true
