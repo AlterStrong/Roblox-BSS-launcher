@@ -34,13 +34,14 @@ start_monitoring() {
   date +%s > "$LAST_PING_FILE"
 
   while true; do
+    current_state=$(cat "$STATE_FILE")
     if is_roblox_open; then
-      if [ "$(cat "$STATE_FILE")" = "CLOSED" ]; then
+      if [ "$current_state" = "CLOSED" ]; then
         send_discord "@everyone :white_check_mark: Roblox telah dibuka!"
         echo "OPEN" > "$STATE_FILE"
       fi
     else
-      if [ "$(cat "$STATE_FILE")" = "OPEN" ]; then
+      if [ "$current_state" = "OPEN" ]; then
         send_discord "@everyone :x: Roblox telah ditutup!"
         echo "CLOSED" > "$STATE_FILE"
       fi
@@ -49,10 +50,10 @@ start_monitoring() {
       sleep 10
     fi
 
-    # Notifikasi setiap 2 jam
     now=$(date +%s)
     last_ping=$(cat "$LAST_PING_FILE")
-    if [ $((now - last_ping)) -ge 7200 ]; then
+    diff=$((now - last_ping))
+    if [ "$diff" -ge 7200 ]; then
       send_discord ":alarm_clock: Sudah 2 jam sejak monitoring berjalan."
       date +%s > "$LAST_PING_FILE"
     fi
@@ -77,7 +78,7 @@ case "$1" in
       echo "Monitoring sudah berjalan."
       exit 1
     fi
-    SCRIPT_PATH="$(realpath "$0")"
+    SCRIPT_PATH=$(realpath "$0")
     nohup bash "$SCRIPT_PATH" run > /dev/null 2>&1 &
     echo $! > "$PID_FILE"
     echo "Monitoring dimulai."
@@ -90,66 +91,6 @@ case "$1" in
     ;;
   setup)
     pkg install -y termux-api curl coreutils
-    termux-setup-storage
-    echo "Setup selesai. Jalankan: bash roblox_monitor.sh start"
-    ;;
-  *)
-    echo "Gunakan: bash roblox_monitor.sh {setup|start|stop}"
-    ;;
-esac      if [ "$last_status" != "running" ]; then
-        send_discord "@everyone :video_game: Roblox dibuka kembali."
-        log "Roblox dibuka."
-        last_status="running"
-        tick=0  # reset uptime saat dibuka kembali
-      fi
-    else
-      if [ "$last_status" != "closed" ]; then
-        send_discord ":warning: Roblox tidak aktif. Auto-rejoin dilakukan."
-        log "Roblox ditutup. Membuka ulang..."
-        last_status="closed"
-      fi
-      open_game
-      sleep 10
-    fi
-
-    tick=$((tick + 1))
-    if [ $((tick % 24)) -eq 0 ]; then
-      uptime_hours=$((tick * 5 / 60))  # setiap 2 jam (24*5 menit)
-      send_discord ":alarm_clock: Uptime: ${uptime_hours} jam"
-    fi
-
-    sleep 300  # 5 menit
-  done
-}
-
-stop_monitoring() {
-  if [ -f "$PID_FILE" ]; then
-    kill "$(cat "$PID_FILE")" && rm -f "$PID_FILE"
-    send_discord ":stop_sign: Monitoring dihentikan secara manual."
-    log "Monitoring dihentikan."
-  else
-    echo "Monitoring tidak sedang berjalan."
-  fi
-}
-
-case "$1" in
-  start)
-    if [ -f "$PID_FILE" ]; then
-      echo "Monitoring sudah berjalan."
-      exit 1
-    fi
-    nohup bash "$0" run > /dev/null 2>&1 &
-    echo $! > "$PID_FILE"
-    echo "Monitoring dimulai."
-    ;;
-  run)
-    start_monitoring
-    ;;
-  stop)
-    stop_monitoring
-    ;;
-  setup)
-    pkg install -y termux-api curl
     termux-setup-storage
     echo "Setup selesai. Jalankan: bash roblox_monitor.sh start"
     ;;
