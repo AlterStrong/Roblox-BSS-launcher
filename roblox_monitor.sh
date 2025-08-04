@@ -7,8 +7,6 @@ DISCORD_WEBHOOK="https://discord.com/api/webhooks/1363321007389020200/l6y9LMQzwc
 LOG_FILE="$HOME/roblox_log.txt"
 PID_FILE="$HOME/.roblox_monitor_pid"
 
-# === FUNGSI ===
-
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
@@ -23,7 +21,7 @@ is_app_running() {
 }
 
 check_battery() {
-  termux-battery-status | grep -o '"percentage": *[0-9]*' | grep -o '[0-9]*'
+  termux-battery-status | jq '.percentage'
 }
 
 monitor_loop() {
@@ -33,8 +31,76 @@ monitor_loop() {
 
   while true; do
     percent=$(check_battery)
-    if [ "$percent" -lt 20 ]; then
-      log "⚠️ Baterai rendah: $percent%"
+    if [[ "$percent" =~ ^[0-9]+$ ]] && [ "$percent" -lt 20 ]; then
+      if ! $lowbat_warned; then
+        log "⚠️ Baterai rendah: $percent%"
+        send_discord "⚠️ Baterai < 20%! Monitoring dihentikan untuk menghemat baterai."
+        lowbat_warned=true
+        break
+      fi
+    fi
+
+    if is_app_running; then
+      log "🎮 Roblox sedang berjalan"
+    else
+      log "🚀 Roblox tidak aktif, membuka game..."
+      am start -a android.intent.action.VIEW -d "$GAME_LINK" > /dev/null 2>&1
+      send_discord "🔁 Auto-rejoin Roblox."
+      sleep 10
+    fi
+
+    sleep 300
+  done
+}
+
+start_monitoring(){
+  if [ -f "$PID_FILE" ]; then
+    echo "⚠️ Monitoring sudah aktif (PID: $(cat $PID_FILE))"
+    exit 1
+  fi
+  nohup bash "$0" internal_loop > /dev/null 2>&1 &
+  echo $! > "$PID_FILE"
+  echo "🚀 Monitoring dimulai (PID: $(cat $PID_FILE))"
+}
+
+stop_monitoring(){
+  if [ -f "$PID_FILE" ]; then
+    PID=$(cat "$PID_FILE")
+    kill "$PID" && rm -f "$PID_FILE"
+    echo "🛑 Monitoring dihentikan (PID: $PID)"
+  else
+    echo "ℹ️ Monitoring belum aktif."
+  fi
+}
+
+setup_environment(){
+  pkg update -y
+  pkg install -y termux-api jq curl
+  termux-setup-storage
+
+  echo ""
+  echo "✅ Dependencies terinstal."
+  echo ""
+  echo "⚠️ Sekarang izinkan permission berikut secara manual:"
+  echo "  • Battery info"
+  echo "  • Usage/access stats"
+  echo "  • Open app via intent"
+  echo ""
+  echo "Buka: Settings → Apps → Termux → Permissions → izinkan semuanya"
+  read -p "Tekan ENTER setelah selesai memberi izin... "
+  echo "✅ Setup selesai."
+  echo "Gunakan:"
+  echo "bash $0 start   # untuk memulai monitoring"
+  echo "bash $0 stop    # untuk menghentikan monitoring"
+}
+
+case "$1" in
+  setup)         setup_environment ;;
+  start)         start_monitoring ;;
+  stop)          stop_monitoring ;;
+  internal_loop) monitor_loop ;;
+  *) echo "Gunakan: $0 {setup|start|stop}" ;;
+esac      log "⚠️ Baterai rendah: $percent%"
       if ! $lowbat_warned; then
         send_discord "⚠️ Baterai < 20%! Ketik 'Baiklah' di Termux untuk hentikan notifikasi."
         lowbat_warned=true
