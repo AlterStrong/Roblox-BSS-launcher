@@ -35,6 +35,61 @@ monitor_loop() {
     fi
 
     counter=$((counter + 1))
+    if [ $((counter % 60)) -eq 0 ]; then
+      send_discord "⏰ Reminder: Monitoring Roblox sudah berjalan selama $((counter / 12)) jam."
+    fi
+
+    sleep 300
+  done
+}
+
+start_monitoring(){
+  if [ -f "$PID_FILE" ]; then
+    echo "⚠️ Monitoring sudah aktif (PID: $(cat $PID_FILE))"
+    exit 1
+  fi
+  nohup bash -c "$(declare -f log send_discord is_app_running monitor_loop); monitor_loop" > /dev/null 2>&1 &
+  echo $! > "$PID_FILE"
+  echo "🚀 Monitoring dimulai (PID: $(cat $PID_FILE))"
+}
+
+stop_monitoring(){
+  if [ -f "$PID_FILE" ]; then
+    PID=$(cat "$PID_FILE")
+    kill "$PID" && rm -f "$PID_FILE"
+    echo "🛑 Monitoring dihentikan (PID: $PID)"
+  else
+    echo "ℹ️ Monitoring belum aktif."
+  fi
+}
+
+setup_environment(){
+  pkg update -y
+  pkg install -y termux-api curl
+  termux-setup-storage
+
+  echo ""
+  echo "✅ Dependencies terinstal."
+  echo ""
+  echo "⚠️ Sekarang izinkan permission berikut secara manual:"
+  echo "  • Battery info"
+  echo "  • Usage/access stats"
+  echo "  • Open app via intent"
+  echo ""
+  echo "Buka: Settings → Apps → Termux → Permissions → izinkan semuanya"
+  read -p "Tekan ENTER setelah selesai memberi izin... "
+  echo "✅ Setup selesai."
+  echo "Gunakan:"
+  echo "bash $0 start   # untuk memulai monitoring"
+  echo "bash $0 stop    # untuk menghentikan monitoring"
+}
+
+case "$1" in
+  setup)   setup_environment ;;
+  start)   start_monitoring ;;
+  stop)    stop_monitoring ;;
+  *) echo "Gunakan: $0 {setup|start|stop}" ;;
+esac    counter=$((counter + 1))
     if (( counter % 60 == 0 )); then  # 60 x 300s = 5 jam
       send_discord "⏰ Reminder: Monitoring Roblox masih aktif (5 jam terakhir)."
     fi
