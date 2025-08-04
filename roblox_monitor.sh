@@ -24,17 +24,50 @@ start_monitoring() {
 
   last_status="unknown"
   uptime_counter=0
-  interval_check=300  # 5 menit = 300 detik
-  interval_uptime=14400  # 2 jam = 7200 detik → karena check setiap 5 menit, berarti 14400 / 300 = 48 kali
+  interval_check=300  # 5 menit
   tick=0
 
   while true; do
-    app_running=$(ps | grep "$PKG_NAME" | grep -v "grep" > /dev/null && echo "yes" || echo "no")
+    app_running=$(ps | grep "$PKG_NAME" | grep -v grep | wc -l)
+    if [ "$app_running" -gt 0 ]; then
+      app_status="yes"
+    else
+      app_status="no"
+    fi
 
-    if [ "$app_running" = "yes" ] && [ "$last_status" != "running" ]; then
+    if [ "$app_status" = "yes" ] && [ "$last_status" != "running" ]; then
       log "Roblox telah dibuka"
       send_discord "Roblox telah dibuka."
       last_status="running"
+    elif [ "$app_status" = "no" ] && [ "$last_status" != "closed" ]; then
+      log "Roblox telah ditutup"
+      send_discord "Roblox telah ditutup."
+      last_status="closed"
+    fi
+
+    tick=$((tick + 1))
+    if [ $((tick % 24)) -eq 0 ]; then  # Setiap 2 jam
+      uptime_counter=$((uptime_counter + 2))
+      send_discord "Uptime: ${uptime_counter} jam"
+    fi
+
+    sleep $interval_check
+  done
+}
+
+# === MAIN ===
+case "$1" in
+  start)
+    start_monitoring
+    ;;
+  setup)
+    echo "Menjalankan Roblox untuk pertama kali..."
+    am start -a android.intent.action.VIEW -d "$GAME_LINK"
+    ;;
+  *)
+    echo "Gunakan: bash roblox_monitor.sh start | setup"
+    ;;
+esac      last_status="running"
     elif [ "$app_running" = "no" ] && [ "$last_status" != "closed" ]; then
       log "Roblox telah ditutup"
       send_discord "Roblox telah ditutup."
