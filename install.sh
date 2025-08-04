@@ -1,23 +1,17 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# Instal dependensi yang diperlukan
 pkg update -y
 pkg install -y curl termux-api git
-
-# Aktifkan Termux API (pastikan Termux:API terinstal dari Play Store/F-Droid)
 termux-setup-storage
-yes | termux-battery-status > /dev/null 2>&1 || echo "⚠️ Termux:API belum terpasang!"
 
-# Unduh semua skrip dari GitHub
 REPO="https://raw.githubusercontent.com/AlterStrong/Roblox-BSS-launcher/main"
 
 curl -O $REPO/roblox_monitor.sh
 curl -O $REPO/start.sh
 curl -O $REPO/stop.sh
 
-# Jadikan executable
 chmod +x roblox_monitor.sh start.sh stop.sh
 
-# Jalankan setup awal
 echo -e "\n✅ Semua file berhasil diunduh. Gunakan perintah berikut untuk memulai:"
+echo "  bash roblox_monitor.sh setup"
 echo "  bash start.sh"
