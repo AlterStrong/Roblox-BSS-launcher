@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/data/data/com.termux/files/usr/bin/sh
 
 GAME_LINK="roblox://placeId=1537690962/"
 PKG_NAME="com.roblox.client"
@@ -9,7 +9,7 @@ STATE_FILE="$HOME/.roblox_last_state"
 
 send_discord() {
   curl -s -H "Content-Type: application/json" -X POST \
-    -d "{\"content\": \"$1\"}" "$DISCORD_WEBHOOK" > /dev/null
+    -d "{\"content\": \"$1\"}" "$DISCORD_WEBHOOK" >/dev/null
 }
 
 open_game() {
@@ -17,17 +17,16 @@ open_game() {
 }
 
 log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+  echo "[`date '+%Y-%m-%d %H:%M:%S'`] $1" >> "$LOG_FILE"
 }
 
 is_roblox_open() {
-  # Gunakan dumpsys jika tersedia, jika tidak fallback ke `pidof`
-  which dumpsys > /dev/null 2>&1
+  which dumpsys >/dev/null 2>&1
   if [ $? -eq 0 ]; then
-    dumpsys window windows | grep -i "$PKG_NAME" > /dev/null 2>&1
+    dumpsys window windows | grep -i "$PKG_NAME" >/dev/null 2>&1
     return $?
   else
-    pidof "$PKG_NAME" > /dev/null 2>&1
+    pidof "$PKG_NAME" >/dev/null 2>&1
     return $?
   fi
 }
@@ -43,8 +42,9 @@ start_monitoring() {
 
   counter=0
 
-  while true; do
-    current_state=$(cat "$STATE_FILE")
+  while true
+  do
+    current_state=`cat "$STATE_FILE"`
     is_roblox_open
     if [ $? -eq 0 ]; then
       if [ "$current_state" != "open" ]; then
@@ -61,9 +61,11 @@ start_monitoring() {
       fi
     fi
 
-    counter=$((counter + 1))
-    if [ $((counter % 24)) -eq 0 ]; then
-      send_discord "⏰ Reminder: Sudah $((counter / 12)) jam monitoring berjalan."
+    counter=`expr $counter + 1`
+    mod=`expr $counter % 24`
+    if [ "$mod" -eq 0 ]; then
+      jam=`expr $counter / 12`
+      send_discord "⏰ Reminder: Sudah $jam jam monitoring berjalan."
     fi
 
     sleep 300
@@ -72,7 +74,7 @@ start_monitoring() {
 
 stop_monitoring() {
   if [ -f "$PID_FILE" ]; then
-    kill "$(cat "$PID_FILE")" && rm -f "$PID_FILE"
+    kill `cat "$PID_FILE"` && rm -f "$PID_FILE"
     log "Monitoring dihentikan."
     send_discord "🛑 Monitoring dihentikan secara manual."
   else
@@ -86,7 +88,7 @@ case "$1" in
       echo "Monitoring sudah berjalan."
       exit 1
     fi
-    nohup bash "$0" run > /dev/null 2>&1 &
+    nohup sh "$0" run >/dev/null 2>&1 &
     echo $! > "$PID_FILE"
     echo "Monitoring dimulai."
     ;;
@@ -99,129 +101,9 @@ case "$1" in
   setup)
     pkg install -y termux-api curl
     termux-setup-storage
-    echo "Setup selesai. Jalankan: bash roblox_monitor.sh start"
+    echo "Setup selesai. Jalankan: sh roblox_monitor.sh start"
     ;;
   *)
-    echo "Gunakan: bash roblox_monitor.sh {setup|start|stop}"
-    ;;
-esac      if [ "$last_status" != "open" ]; then
-        log "Roblox dibuka."
-        send_discord "@everyone :white_check_mark: Roblox telah dibuka kembali!"
-        last_status="open"
-      fi
-    else
-      if [ "$last_status" != "closed" ]; then
-        log "Roblox ditutup. Membuka ulang..."
-        send_discord ":x: Roblox telah ditutup! Melakukan auto-rejoin..."
-        open_game
-        last_status="closed"
-      fi
-    fi
-
-    counter=$((counter + 1))
-    if [ $((counter % 24)) -eq 0 ]; then
-      send_discord ":alarm_clock: Sudah 2 jam sejak monitoring dimulai."
-    fi
-
-    sleep 300
-  done
-}
-
-stop_monitoring() {
-  if [ -f "$PID_FILE" ]; then
-    kill "$(cat "$PID_FILE")" && rm -f "$PID_FILE"
-    log "Monitoring dihentikan."
-    send_discord ":stop_sign: Monitoring dihentikan secara manual."
-  else
-    echo "Monitoring tidak berjalan."
-  fi
-}
-
-case "$1" in
-  start)
-    if [ -f "$PID_FILE" ]; then
-      echo "Monitoring sudah berjalan."
-      exit 1
-    fi
-    nohup bash "$0" run > /dev/null 2>&1 &
-    echo $! > "$PID_FILE"
-    echo "Monitoring dimulai."
-    ;;
-  run)
-    start_monitoring
-    ;;
-  stop)
-    stop_monitoring
-    ;;
-  setup)
-    pkg install -y termux-api curl
-    termux-setup-storage
-    echo "Setup selesai. Jalankan: bash roblox_monitor.sh start"
-    ;;
-  *)
-    echo "Gunakan: bash roblox_monitor.sh {setup|start|stop}"
-    ;;
-esac    current_state=$(cat "$STATE_FILE")
-    if is_roblox_open; then
-      if [ "$current_state" = "CLOSED" ]; then
-        send_discord "@everyone :white_check_mark: Roblox telah dibuka!"
-        echo "OPEN" > "$STATE_FILE"
-      fi
-    else
-      if [ "$current_state" = "OPEN" ]; then
-        send_discord "@everyone :x: Roblox telah ditutup!"
-        echo "CLOSED" > "$STATE_FILE"
-      fi
-      log "Roblox tidak aktif. Membuka ulang..."
-      open_game
-      sleep 10
-    fi
-
-    now=$(date +%s)
-    last_ping=$(cat "$LAST_PING_FILE")
-    diff=$((now - last_ping))
-    if [ "$diff" -ge 7200 ]; then
-      send_discord ":alarm_clock: Sudah 2 jam sejak monitoring berjalan."
-      date +%s > "$LAST_PING_FILE"
-    fi
-
-    sleep 300
-  done
-}
-
-stop_monitoring() {
-  if [ -f "$PID_FILE" ]; then
-    kill "$(cat "$PID_FILE")" && rm -f "$PID_FILE"
-    send_discord ":stop_sign: Monitoring dihentikan secara manual."
-    log "Monitoring dihentikan."
-  else
-    echo "Monitoring tidak sedang berjalan."
-  fi
-}
-
-case "$1" in
-  start)
-    if [ -f "$PID_FILE" ]; then
-      echo "Monitoring sudah berjalan."
-      exit 1
-    fi
-    SCRIPT_PATH=$(realpath "$0")
-    nohup bash "$SCRIPT_PATH" run > /dev/null 2>&1 &
-    echo $! > "$PID_FILE"
-    echo "Monitoring dimulai."
-    ;;
-  run)
-    start_monitoring
-    ;;
-  stop)
-    stop_monitoring
-    ;;
-  setup)
-    pkg install -y termux-api curl coreutils
-    termux-setup-storage
-    echo "Setup selesai. Jalankan: bash roblox_monitor.sh start"
-    ;;
-  *)
-    echo "Gunakan: bash roblox_monitor.sh {setup|start|stop}"
+    echo "Gunakan: sh roblox_monitor.sh {setup|start|stop}"
     ;;
 esac
