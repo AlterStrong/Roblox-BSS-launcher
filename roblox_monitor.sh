@@ -1,40 +1,33 @@
-#!/data/data/com.termux/files/usr/bin/sh
+#!/data/data/com.termux/files/usr/bin/bash
 
+# === KONFIGURASI ===
 GAME_LINK="roblox://placeId=1537690962/"
 PKG_NAME="com.roblox.client"
-DISCORD_WEBHOOK="https://discord.com/api/webhooks/1363321007389020200/l6y9LMQzwcFu15uiQfC8XawlcqixNLukLcPoREBXyXYNqK9mFwGRW6qbgNJYmCTi9v_f"
-LOG_FILE="$HOME/roblox_log.txt"
-PID_FILE="$HOME/.roblox_monitor_pid"
-STATE_FILE="$HOME/.roblox_last_state"
+SLEEP_DURATION=300  # 5 menit
 
-send_discord() {
-  curl -s -H "Content-Type: application/json" -X POST \
-    -d "{\"content\": \"$1\"}" "$DISCORD_WEBHOOK" >/dev/null
+# === FUNGSI ===
+
+is_roblox_open() {
+  pidof "$PKG_NAME" > /dev/null 2>&1
+  return $?
 }
 
 open_game() {
-  am start -a android.intent.action.VIEW -d "$GAME_LINK"
+  termux-open-url "$GAME_LINK"
 }
 
-log() {
-  echo "[`date '+%Y-%m-%d %H:%M:%S'`] $1" >> "$LOG_FILE"
-}
+# === LOOP UTAMA ===
 
-is_roblox_open() {
-  which dumpsys >/dev/null 2>&1
-  if [ $? -eq 0 ]; then
-    dumpsys window windows | grep -i "$PKG_NAME" >/dev/null 2>&1
-    return $?
+echo "[INFO] Monitoring dimulai..."
+while true; do
+  if is_roblox_open; then
+    echo "[INFO] Roblox sedang berjalan."
   else
-    pidof "$PKG_NAME" >/dev/null 2>&1
-    return $?
+    echo "[INFO] Roblox tidak berjalan. Membuka kembali..."
+    open_game
   fi
-}
-
-start_monitoring() {
-  touch "$LOG_FILE"
-  log "Monitoring dimulai."
-  send_discord ":rocket: Monitoring dimulai! Roblox akan auto-rejoin jika keluar."
+  sleep "$SLEEP_DURATION"
+done  send_discord ":rocket: Monitoring dimulai! Roblox akan auto-rejoin jika keluar."
 
   if [ ! -f "$STATE_FILE" ]; then
     echo "unknown" > "$STATE_FILE"
