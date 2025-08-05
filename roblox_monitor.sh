@@ -6,10 +6,7 @@ PKG_NAME="com.roblox.client"
 DISCORD_WEBHOOK="https://discord.com/api/webhooks/1363321007389020200/l6y9LMQzwcFu15uiQfC8XawlcqixNLukLcPoREBXyXYNqK9mFwGRW6qbgNJYmCTi9v_f"
 LOG_FILE="$HOME/roblox_log.txt"
 PID_FILE="$HOME/.roblox_monitor_pid"
-STATE_FILE="$HOME/.roblox_status"
-LAST_PING_FILE="$HOME/.last_ping_time"
 
-# === FUNGSI ===
 send_discord() {
   curl -s -H "Content-Type: application/json" -X POST \
     -d "{\"content\": \"$1\"}" "$DISCORD_WEBHOOK" > /dev/null
@@ -28,13 +25,73 @@ is_roblox_open() {
 }
 
 start_monitoring() {
-  send_discord "@everyone :rocket: Monitoring dimulai! Roblox akan auto-rejoin jika keluar."
+  touch "$LOG_FILE"
   log "Monitoring dimulai."
-  echo "CLOSED" > "$STATE_FILE"
-  date +%s > "$LAST_PING_FILE"
+  send_discord ":rocket: Monitoring dimulai! Roblox akan auto-rejoin jika keluar."
+
+  last_status="unknown"
+  counter=0
 
   while true; do
-    current_state=$(cat "$STATE_FILE")
+    if is_roblox_open; then
+      if [ "$last_status" != "open" ]; then
+        log "Roblox dibuka."
+        send_discord "@everyone :white_check_mark: Roblox telah dibuka kembali!"
+        last_status="open"
+      fi
+    else
+      if [ "$last_status" != "closed" ]; then
+        log "Roblox ditutup. Membuka ulang..."
+        send_discord ":x: Roblox telah ditutup! Melakukan auto-rejoin..."
+        open_game
+        last_status="closed"
+      fi
+    fi
+
+    counter=$((counter + 1))
+    if [ $((counter % 24)) -eq 0 ]; then
+      send_discord ":alarm_clock: Sudah 2 jam sejak monitoring dimulai."
+    fi
+
+    sleep 300
+  done
+}
+
+stop_monitoring() {
+  if [ -f "$PID_FILE" ]; then
+    kill "$(cat "$PID_FILE")" && rm -f "$PID_FILE"
+    log "Monitoring dihentikan."
+    send_discord ":stop_sign: Monitoring dihentikan secara manual."
+  else
+    echo "Monitoring tidak berjalan."
+  fi
+}
+
+case "$1" in
+  start)
+    if [ -f "$PID_FILE" ]; then
+      echo "Monitoring sudah berjalan."
+      exit 1
+    fi
+    nohup bash "$0" run > /dev/null 2>&1 &
+    echo $! > "$PID_FILE"
+    echo "Monitoring dimulai."
+    ;;
+  run)
+    start_monitoring
+    ;;
+  stop)
+    stop_monitoring
+    ;;
+  setup)
+    pkg install -y termux-api curl
+    termux-setup-storage
+    echo "Setup selesai. Jalankan: bash roblox_monitor.sh start"
+    ;;
+  *)
+    echo "Gunakan: bash roblox_monitor.sh {setup|start|stop}"
+    ;;
+esac    current_state=$(cat "$STATE_FILE")
     if is_roblox_open; then
       if [ "$current_state" = "CLOSED" ]; then
         send_discord "@everyone :white_check_mark: Roblox telah dibuka!"
